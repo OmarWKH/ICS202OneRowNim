@@ -1,9 +1,11 @@
-/**
+/*
  * Omar Khashoggi
  * 201369650
  *
+ * Just so presentation in the lap goes smoother:
  * javac gametree/*.java && javac *.java
  * java TestGameTree
+ * http://stackoverflow.com/questions/6832496/command-prompt-how-to-add-a-set-path-only-for-that-batch-file-executing
  */
 
 import gametree.*;
@@ -14,17 +16,16 @@ import java.util.Random;
 
 public class TestGameTree {
 	/*
-	 * Refactoring
+	 * Redesign Player and player related things
 	 * Organize and document code
-	 * buield?
 	 *
-	 *  hint: show next possible move if player want
-	 *  optional: perfect, somewhat perfect, random strategy
+	 * Might revise:
+	 *  Strategies and hints
 	 */
 
 	public static SimpleNimGameTree tree;
-	public static PlayerAI playerAI;
-	public static int hintLevel;
+	public static RealPlayer player;
+	public static Player playerAI;
 
 	public static boolean playerIsFirst;
 	public static boolean currentTurnIsPlayers;
@@ -32,11 +33,9 @@ public class TestGameTree {
 	public static boolean gameIsDone;
 
 	public static Scanner userInput;
-	public static Random random;
 
 	public static void main(String[] args) {
 		userInput = new Scanner(System.in);
-		random = new Random();
 
 		startingUI();
 		userInput.close();
@@ -95,9 +94,9 @@ public class TestGameTree {
 		}
 
 		//computer and hint strategy
-		System.out.println(PlayerAI.PERFECT_STRATEGY + ". Perfect strategy (deterministic with minimax, remove 2 if no move is optimal)");
-		System.out.println(PlayerAI.DECENT_STRATEGY + ". Decent strategy (each hint is a coin flip between perfect and random)");
-		System.out.println(PlayerAI.RANDOM_STRATEGY + ". Random strategy (coin flip)");
+		System.out.println(Player.PERFECT_STRATEGY + ". Perfect strategy (deterministic with minimax, remove 2 if no move is optimal)");
+		System.out.println(Player.DECENT_STRATEGY + ". Decent strategy (each hint is a coin flip between perfect and random)");
+		System.out.println(Player.RANDOM_STRATEGY + ". Random strategy (coin flip)");
 		while (playerAI == null) {
 			System.out.print("Choose a strategy for the computer and the hint system by inputting a number: ");
 			
@@ -110,8 +109,8 @@ public class TestGameTree {
 				continue;
 			}
 
-			hintLevel = strategy;
-			playerAI = new PlayerAI(tree, strategy, !playerIsFirst);
+			player = new RealPlayer(tree, strategy, playerIsFirst, userInput);
+			playerAI = new Player(tree, strategy, !playerIsFirst);
 			printFeedback("Your opponent is assembled and awaits you eagerly");
 		}
 
@@ -133,9 +132,9 @@ public class TestGameTree {
 
 			int input = 0;
 			if (currentTurnIsPlayers) {
-				input = getUserInputInGame();
+				input = player.getUserInputInGame();
 			} else {
-				input = playerAI.makeMove();
+				input = playerAI.getNextMove();
 			}
 
 			switch (input) {
@@ -146,7 +145,7 @@ public class TestGameTree {
 					moveValue = tree.removeTwo(); printFeedback("PLAYED: Removed two");
 					checkMoveValue(moveValue); break;
 				case SHOW_HINT:
-					printFeedback("HINT: " + getWrittenHintForPlayer());
+					printFeedback("HINT: " + player.getWrittenHint());
 					break;
 				case OPTIONS:
 					optoinsUI();
@@ -201,30 +200,6 @@ public class TestGameTree {
 		return lastChoice;
 	}
 
-	public static int getUserInputInGame() {
-		int lastChoice = TestGameTree.printInGameChoices();
-		
-		int input = 0;
-		boolean validInput = false;
-		while (!validInput) {
-			System.out.print("Choose by inputting a number: ");
-			try {
-				input = userInput.nextInt();
-			} catch (InputMismatchException ime) {
-				printFeedback("Invalid input. Input an integer");
-				userInput.next();
-				continue;
-			}
-
-			validInput = (1 <= input) && (input <= lastChoice);
-			if (!validInput) {
-				printFeedback("Invalid input. Input on of the shown options");
-			}
-		}
-
-		return input;
-	}
-
 	public static int getUserInputOptions() {
 		int lastChoice = TestGameTree.printOptionsChoices();
 		
@@ -247,50 +222,6 @@ public class TestGameTree {
 		}
 
 		return input;
-	}
-
-	public static String getWrittenHintForPlayer() {
-		int hint = getHintForPlayer();
-
-		if (hint == 0) {
-			return "Remove either. The only way to win is for your opponent to play imperfectly";
-		} else if (hint == 1) {
-			return "Remove one";
-		} else {
-			return "Remove two";
-		}
-	}
-
-	public static int getHintForPlayer() {
-		if (hintLevel == PlayerAI.PERFECT_STRATEGY) {
-			return tree.getNextBestMove(playerIsFirst);
-		} else if (hintLevel == PlayerAI.DECENT_STRATEGY) {
-			int coinFlip = random.nextInt(2);
-			if (coinFlip == 0) {
-				return tree.getNextBestMove(playerIsFirst);
-			} else {
-				return getRandomHintForPlayer();
-			}
-		} else if (hintLevel == PlayerAI.RANDOM_STRATEGY) {
-			return getRandomHintForPlayer();
-		} else {
-			return 1; //will never run
-		}
-	}
-
-	public static int getRandomHintForPlayer() {
-		int possibleMoves = tree.possibleMoves();
-
-		if (possibleMoves != 0) {
-			return possibleMoves; //only one move is possible
-		} else {
-			int coinFlip = random.nextInt(2);
-			if (coinFlip == 0) {
-				return 1;
-			} else {
-				return 2;
-			}
-		}
 	}
 
 	public static void checkMoveValue(int moveValue) {
@@ -327,7 +258,7 @@ public class TestGameTree {
 		GameTreeWindow window = new GameTreeWindow(tree);
 	}
 
-	private static void printFeedback(String feedback) {
+	public static void printFeedback(String feedback) {
 		try {
 			Thread.sleep(250);
 		} catch(InterruptedException ex) {
